@@ -43,6 +43,17 @@ def train_local(net, graph, feats, opt, args, memorybank_nor,memorybank_abnor,in
     # 修改
     for epoch in range(args.local_epochs): #local_epochs:100
 
+        net.train()
+        if epoch >= 3:
+            t0 = time.time()
+        opt.zero_grad()
+        loss, l1, l2 = net(feats)
+        loss.backward()
+        opt.step()
+        # 记录当前epoch的异常分数
+        pos = graph.ndata['pos']
+        train_ano_score[epoch] = -pos.detach().view(-1)
+
         if epoch > 0:
             #动态添加正太池
             _, train_list_temp = train_ano_score[epoch - 1].topk(
@@ -67,6 +78,7 @@ def train_local(net, graph, feats, opt, args, memorybank_nor,memorybank_abnor,in
             train_ano_score = scaler.fit_transform(train_ano_score.T).T
             train_ano_score = torch.DoubleTensor(train_ano_score).cuda()
 
+            #克隆一份
             train_ano_scoreclone = train_ano_score.clone()
 
             # 计算每个节点在多个epoch中正太池的平均异常得分
@@ -89,19 +101,6 @@ def train_local(net, graph, feats, opt, args, memorybank_nor,memorybank_abnor,in
             train_ano_score = train_ano_scoreclone / abnormal_non_zero_count
             _, abnormal_indices = train_ano_scoreclone.topk(int(0.05 * num_nodes), dim=0, largest=True, sorted=True)
             abnor_idx = abnormal_indices.cpu().numpy().tolist()
-
-
-
-        net.train()
-        if epoch >= 3:
-            t0 = time.time()
-        opt.zero_grad()
-        loss, l1, l2 = net(feats)
-        loss.backward()
-        opt.step()
-        # 记录当前epoch的异常分数
-        pos = graph.ndata['pos']
-        train_ano_score[epoch] = -pos.detach().view(-1)
 
 
         if epoch >= 3:
