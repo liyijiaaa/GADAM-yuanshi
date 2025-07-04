@@ -101,7 +101,7 @@ def train_local(net, graph, feats, opt, args, memorybank_nor,memorybank_abnor,in
         opt.step()
         # 记录当前epoch的异常分数
         pos = graph.ndata['pos']
-        train_ano_score[epoch] = -pos.detach()
+        train_ano_score[epoch] = -pos.detach().view(-1)
 
 
         if epoch >= 3:
