@@ -87,7 +87,7 @@ def train_local(net, graph, feats, opt, args, memorybank_nor,memorybank_abnor,in
             train_ano_score_nonzero = torch.count_nonzero(train_ano_score, dim=0)
             train_ano_score = torch.sum(train_ano_score, dim=0)
             train_ano_score = train_ano_score / train_ano_score_nonzero
-            _, train_list = train_ano_score.topk(int(0.8 * num_nodes), dim=0, largest=False, sorted=True)
+            _, train_list = train_ano_score.topk(int(0.30 * num_nodes), dim=0, largest=False, sorted=True)
 
             train_list = train_list.cpu().numpy()
             train_list = train_list.tolist()
@@ -113,14 +113,15 @@ def train_local(net, graph, feats, opt, args, memorybank_nor,memorybank_abnor,in
         print("Epoch {} | Time(s) {:.4f} | Loss {:.4f} | l1 {:.4f} | l2 {:.4f}"
               .format(epoch+1, np.mean(dur), loss.item(), l1.item(), l2.item()))
 
-        memo['graph'] = graph
-        net.load_state_dict(torch.load('best_local_model.pkl'))
-        h, mean_h = net.encoder(feats)
-        h, mean_h = h.detach(), mean_h.detach()
-        memo['h'] = h
-        memo['mean_h'] = mean_h
 
-        torch.save(memo, 'memo.pth')
+    #循环结束后加载最优模型
+    memo['graph'] = graph
+    net.load_state_dict(torch.load('best_local_model.pkl'))
+    h, mean_h = net.encoder(feats)
+    h, mean_h = h.detach(), mean_h.detach()
+    memo['h'] = h
+    memo['mean_h'] = mean_h
+    torch.save(memo, 'memo.pth')
 
     return nor_idx,abnor_idx
 
