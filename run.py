@@ -87,7 +87,7 @@ def train_local(net, graph, feats, opt, args, memorybank_nor,memorybank_abnor,in
             train_ano_score_nonzero = torch.count_nonzero(train_ano_score, dim=0)
             train_ano_score = torch.sum(train_ano_score, dim=0)
             train_ano_score = train_ano_score / train_ano_score_nonzero
-            _, train_list = train_ano_score.topk(int(0.30 * num_nodes), dim=0, largest=False, sorted=True)
+            _, train_list = train_ano_score.topk(int(0.60 * num_nodes), dim=0, largest=False, sorted=True)
 
             train_list = train_list.cpu().numpy()
             train_list = train_list.tolist()
@@ -99,7 +99,7 @@ def train_local(net, graph, feats, opt, args, memorybank_nor,memorybank_abnor,in
             abnormal_non_zero_count = torch.count_nonzero(train_ano_scoreclone, dim=0)
             train_ano_scoreclone = torch.sum(train_ano_scoreclone, dim=0)
             train_ano_score = train_ano_scoreclone / abnormal_non_zero_count
-            _, abnormal_indices = train_ano_scoreclone.topk(int(0.05 * num_nodes), dim=0, largest=True, sorted=True)
+            _, abnormal_indices = train_ano_scoreclone.topk(int(0.3 * num_nodes), dim=0, largest=True, sorted=True)
             abnor_idx = abnormal_indices.cpu().numpy().tolist()
 
 
@@ -146,8 +146,8 @@ def load_info_from_local(local_net,nor_idx,abnor_idx,device):
 
     if device >= 0:
         memo = {k: v.to(device) for k, v in memo.items()}
-        nor_idxt = nor_idx.cuda()
-        ano_idxt = abnor_idx.cuda()
+        nor_idx = nor_idx.cuda()
+        abnor_idx = abnor_idx.cuda()
         center = center.cuda()
 
     return memo, nor_idx, abnor_idx, center
