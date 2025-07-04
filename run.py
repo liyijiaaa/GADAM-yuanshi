@@ -57,7 +57,7 @@ def train_local(net, graph, feats, opt, args, memorybank_nor,memorybank_abnor,in
         if epoch > 0:
             #动态添加正太池
             _, train_list_temp = train_ano_score[epoch - 1].topk(
-                int(num_nodes - (epoch / args.local_epochs) ** 2 * num_nodes), dim=0,
+                int((epoch / args.local_epochs) ** 2 * num_nodes), dim=0,
                 largest=False, sorted=True)
             train_list_temp = train_list_temp.cpu().numpy()
             train_list_temp = train_list_temp.tolist()
@@ -65,7 +65,7 @@ def train_local(net, graph, feats, opt, args, memorybank_nor,memorybank_abnor,in
 
             #动态添加异常池——数量设置的一样
             _, train_list_atemp = train_ano_score[epoch - 1].topk(
-                int(num_nodes - (epoch / args.local_epochs) ** 2 * num_nodes), dim=0,
+                int( (epoch / args.local_epochs) ** 2 * num_nodes), dim=0,
                 largest=True, sorted=True)
             train_list_atemp = train_list_atemp.cpu().numpy()
             train_list_atemp = train_list_atemp.tolist()
