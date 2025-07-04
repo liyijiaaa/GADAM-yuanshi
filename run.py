@@ -65,7 +65,7 @@ def train_local(net, graph, feats, opt, args, memorybank_nor,memorybank_abnor,in
 
             #动态添加异常池——数量设置的一样
             _, train_list_atemp = train_ano_score[epoch - 1].topk(
-                int((epoch / args.local_epochs) ** 2 * num_nodes), dim=0,
+                int(num_nodes - (epoch / args.local_epochs) ** 2 * num_nodes), dim=0,
                 largest=True, sorted=True)
             train_list_atemp = train_list_atemp.cpu().numpy()
             train_list_atemp = train_list_atemp.tolist()
@@ -98,7 +98,7 @@ def train_local(net, graph, feats, opt, args, memorybank_nor,memorybank_abnor,in
                 train_ano_scoreclone[idx, memorybank_abnor[idx]] = 0
             abnormal_non_zero_count = torch.count_nonzero(train_ano_scoreclone, dim=0)
             train_ano_scoreclone = torch.sum(train_ano_scoreclone, dim=0)
-            train_ano_score = train_ano_scoreclone / abnormal_non_zero_count
+            train_ano_scoreclone = train_ano_scoreclone / abnormal_non_zero_count
             _, abnormal_indices = train_ano_scoreclone.topk(int(0.05 * num_nodes), dim=0, largest=True, sorted=True)
             abnor_idx = abnormal_indices.cpu().numpy().tolist()
 
