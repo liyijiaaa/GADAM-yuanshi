@@ -72,6 +72,7 @@ def train_local(net, graph, feats, opt, args, memorybank_nor,memorybank_abnor,in
             train_list_atemp = train_list_atemp.tolist()
             memorybank_abnor.append(train_list_atemp)
 
+
         if epoch == (args.local_epochs-1):
             # 归一化处理
             train_ano_score = train_ano_score.cpu().detach().numpy()

@@ -161,6 +161,7 @@ class GlobalModel(nn.Module):
         h = nei*mean_h + (1-nei)*h
         return h
 
+
     def forward(self, feats, epoch):
         h, mean_h = self.encoder(feats)
 
