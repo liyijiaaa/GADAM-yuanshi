@@ -8,33 +8,32 @@ import math
 from utils import idx_sample, row_normalization
 
 
-
 class MLP(nn.Module):
     def __init__(self, in_dim, out_dim, activation) -> None:
         super().__init__()
-        # self.encoder = nn.ModuleList([
-        #     nn.Linear(in_dim, hid_dim),
-        #     nn.Dropout(p=dropout),
-        #     activation,
-        #     nn.Linear(hid_dim, out_dim),
-        #     nn.Dropout(p=dropout)
-        # ])
         self.encoder = nn.ModuleList([
-            nn.Linear(in_dim, out_dim),
+            nn.Linear(in_dim, 128),
+            nn.Dropout(p=0.),
             activation,
+            nn.Linear(128, out_dim),
+            nn.Dropout(p=0.)
         ])
-    
+        # self.encoder = nn.ModuleList([
+        #     nn.Linear(in_dim, out_dim),
+        #     activation,
+        # ])
+
     def forward(self, features):
         h = features
         for layer in self.encoder:
             h = layer(h)
         h = F.normalize(h, p=2, dim=1)  # row normalize
         return h
-    
+
 
 class GCN(nn.Module):
     def __init__(
-        self, g, in_dim, hid_dim, activation, dropout
+            self, g, in_dim, hid_dim, activation, dropout
     ):
         super(GCN, self).__init__()
         self.g = g
@@ -61,25 +60,25 @@ class MeanAggregator(nn.Module):
 class Discriminator(nn.Module):
     def __init__(self, hid_dim) -> None:
         super().__init__()
-    
+
     def forward(self, features, centers):
         # tmp = torch.matmul(features, self.weight)
         # res = torch.sum(tmp * centers, dim=1)
-        # return torch.sigmoid(res) 
+        # return torch.sigmoid(res)
         return torch.sum(features * centers, dim=1)
 
 
 class Encoder(nn.Module):
-    def __init__(self, graph, in_dim,  out_dim, activation):
+    def __init__(self, graph, in_dim, out_dim, activation):
         super().__init__()
         self.encoder = MLP(in_dim, out_dim, activation)
         # self.encoder = GCN(graph, in_dim, out_dim, activation, dropout=0.)
         self.meanAgg = MeanAggregator()
         self.g = graph
-        
+
     def forward(self, h):
         h = self.encoder(h)
-        mean_h = self.meanAgg(self.g ,h) #邻居聚合得到子图表示
+        mean_h = self.meanAgg(self.g, h)
 
         return h, mean_h
 
@@ -93,10 +92,10 @@ class LocalModel(nn.Module):
         self.discriminator = Discriminator(out_dim)
         self.loss = nn.BCEWithLogitsLoss()
         self.recon_loss = nn.MSELoss()
-    
+
     def forward(self, h):
         h, mean_h = self.encoder(h)
-        
+
         # positive
         pos = self.discriminator(h, mean_h)
         # negtive
@@ -104,7 +103,7 @@ class LocalModel(nn.Module):
         neg_idx = idx_sample(idx)
         neg_neigh_h = mean_h[neg_idx]
         neg = self.discriminator(h, neg_neigh_h)
-        
+
         self.g.ndata['pos'] = pos
         self.g.ndata['neg'] = neg
 
@@ -114,25 +113,24 @@ class LocalModel(nn.Module):
         return l1 + l2, l1, l2
 
 
-
 class GlobalModel(nn.Module):
     def __init__(self, graph, in_dim, out_dim, activation, nor_idx, ano_idx, center):
         super().__init__()
         self.g = graph
         self.discriminator = Discriminator(out_dim)
         self.beta = 0.9
-        self.neigh_weight = 1. 
+        self.neigh_weight = 1.
         self.loss = nn.BCEWithLogitsLoss()
         self.nor_idx = nor_idx
         self.ano_idx = ano_idx
-        self.center = center # high confidence normal center
+        self.center = center  # high confidence normal center
         self.encoder = Encoder(graph, in_dim, out_dim, activation)
         self.pre_attn = self.pre_attention()
 
     def pre_attention(self):
         # calculate pre-attn
-        msg_func = lambda edges:{'abs_diff': torch.abs(edges.src['pos'] - edges.dst['pos'])}
-        red_func = lambda nodes:{'pos_diff': torch.mean(nodes.mailbox['abs_diff'], dim=1)}
+        msg_func = lambda edges: {'abs_diff': torch.abs(edges.src['pos'] - edges.dst['pos'])}
+        red_func = lambda nodes: {'pos_diff': torch.mean(nodes.mailbox['abs_diff'], dim=1)}
         self.g.update_all(msg_func, red_func)
 
         pos = self.g.ndata['pos']
@@ -144,8 +142,8 @@ class GlobalModel(nn.Module):
         diff_std = torch.sqrt(pos_diff[self.nor_idx].var())
 
         normalized_pos = (pos_diff - diff_mean) / diff_std
-        
-        attn = 1-torch.sigmoid(normalized_pos)
+
+        attn = 1 - torch.sigmoid(normalized_pos)
 
         return attn.unsqueeze(1)
 
@@ -154,13 +152,11 @@ class GlobalModel(nn.Module):
         simi = self.discriminator(h, mean_h)
         return simi.unsqueeze(1)
 
-
     def msg_pass(self, h, mean_h, attn):
         # h+attn*mean_h
         nei = attn * self.neigh_weight
-        h = nei*mean_h + (1-nei)*h
+        h = nei * mean_h + (1 - nei) * h
         return h
-
 
     def forward(self, feats, epoch):
         h, mean_h = self.encoder(feats)
@@ -169,17 +165,42 @@ class GlobalModel(nn.Module):
         beta = math.pow(self.beta, epoch)
         if beta < 0.1:
             beta = 0.
-        attn = beta*self.pre_attn + (1-beta)*post_attn
+        attn = beta * self.pre_attn + (1 - beta) * post_attn
+
         h = self.msg_pass(h, mean_h, attn)
 
         scores = self.discriminator(h, self.center)
-        
+
         pos_center_simi = scores[self.nor_idx]
         neg_center_simi = scores[self.ano_idx]
-        
+
         pos_center_loss = self.loss(pos_center_simi, torch.ones_like(pos_center_simi, dtype=torch.float32))
         neg_center_loss = self.loss(neg_center_simi, torch.zeros_like(neg_center_simi, dtype=torch.float32))
 
         center_loss = pos_center_loss + neg_center_loss
 
         return center_loss, scores
+
+    # def forward(self, feats, epoch, ada_neighbor_nodes):
+    #     # h, mean_h = self.encoder(feats)
+    #     h, _ = self.encoder(feats)
+    #     mean_h = torch.mean(h[ada_neighbor_nodes], dim=1)  # 转换为 [n_nodes, feat_dim]
+    #     post_attn = self.post_attention(h, mean_h)
+    #     beta = math.pow(self.beta, epoch)
+    #     if beta < 0.1:
+    #         beta = 0.
+    #     #attn = beta * self.pre_attn + (1 - beta) * post_attn
+    #     attn = post_attn
+    #     h = self.msg_pass(h, mean_h, attn)
+    #
+    #     scores = self.discriminator(h, self.center)
+    #
+    #     pos_center_simi = scores[self.nor_idx]
+    #     neg_center_simi = scores[self.ano_idx]
+    #
+    #     pos_center_loss = self.loss(pos_center_simi, torch.ones_like(pos_center_simi, dtype=torch.float32))
+    #     neg_center_loss = self.loss(neg_center_simi, torch.zeros_like(neg_center_simi, dtype=torch.float32))
+    #
+    #     center_loss = pos_center_loss + neg_center_loss
+    #
+    #     return center_loss, scores

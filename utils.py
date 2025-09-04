@@ -69,6 +69,7 @@ def load_data(dataname, path='./raw_dataset/Flickr'):
     return graph
 
 
+
 def my_load_data(dataname, path='./data/'):
     data_dir = path+dataname+'.bin'
     graph = load_graphs(data_dir)
