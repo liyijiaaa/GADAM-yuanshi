@@ -23,6 +23,7 @@ class MLP(nn.Module):
             activation,
         ])
 
+
     def forward(self, features):
         h = features
         for layer in self.encoder:
